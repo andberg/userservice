@@ -2,6 +2,7 @@ package se.berglund.userservice;
 
 import java.net.URI;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 
@@ -16,16 +17,19 @@ import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.Context;
+import javax.ws.rs.core.GenericEntity;
+import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.Response.Status;
 import javax.ws.rs.core.UriInfo;
 
+import se.berglund.exceptions.InvalidUserFormatException;
 import se.berglund.exceptions.InvalidUserIdException;
 import se.berglund.model.User;
 
 @Path("/users")
-@Consumes("text/plain")
-@Produces("text/plain")
+@Consumes({ MediaType.APPLICATION_XML, MediaType.APPLICATION_JSON })
+@Produces({ MediaType.APPLICATION_XML, MediaType.APPLICATION_JSON })
 public final class UserResource {
 
 	@Context
@@ -34,25 +38,27 @@ public final class UserResource {
 	private static final UserRepository USER_REPOSITORY = new UserRepository();
 
 	@POST
-	public Response addUser(String userAsString) {
+	public Response addUser(User user) {
+		if (user.getEmail() != null && user.getPassword() != null) {
 
-		final User user = USER_REPOSITORY.decodeUserFromCommaSeparatedString(
-				null, userAsString);
-		final URI location = uriInfo.getAbsolutePathBuilder()
-				.path(user.getId().toString()).build();
+			User newUser = USER_REPOSITORY.addUser(user);
+			final URI location = uriInfo.getAbsolutePathBuilder()
+					.path(newUser.getId().toString()).build();
 
-		USER_REPOSITORY.getUsers().put(user.getId(), user);
-
-		return Response.created(location).build();
+			return Response.created(location).build();
+		} else {
+			throw new InvalidUserFormatException(
+					"A user must contain email and password");
+		}
 	}
 
 	@GET
-	@Produces("text/html")
 	public Response getUsers(
 			@QueryParam("sorted-by") @DefaultValue("desc") String sortedBy) {
 
 		List<User> usersList = new ArrayList<User>(USER_REPOSITORY.getUsers()
 				.values());
+
 		if (sortedBy.equals("asc")) {
 			Collections.sort(usersList, new UsersSortedByNameAsAscComparator());
 		} else {
@@ -60,17 +66,11 @@ public final class UserResource {
 					.sort(usersList, new UsersSortedByNameAsDescComparator());
 		}
 
-		StringBuilder userRows = new StringBuilder();
+		GenericEntity<Collection<User>> users = new GenericEntity<Collection<User>>(
+				usersList) {
+		};
 
-		userRows.append("<head><meta charset=utf8></head>");
-
-		for (User user : usersList) {
-			userRows.append("<a href=" + uriInfo.getAbsolutePath() + "/" + user.getId()
-					+ ">" + user.getId() + ", " + user.getEmail() + "</a></br>");
-		}
-
-		
-		return Response.status(Status.OK).entity(userRows.toString()).build();
+		return Response.status(Status.OK).entity(users).build();
 	}
 
 	@GET
@@ -87,14 +87,17 @@ public final class UserResource {
 
 	@PUT
 	@Path("{id}")
-	public Response updateUser(@PathParam("id") Long id, String userAsString) {
+	public Response updateUser(@PathParam("id") Long id, User user) {
 		if (USER_REPOSITORY.getUsers().containsKey(id)) {
-			User user = USER_REPOSITORY.decodeUserFromCommaSeparatedString(id,
-					userAsString);
-			USER_REPOSITORY.getUsers().put(id, user);
-			return Response.status(Status.NO_CONTENT).build();
+			if (user.getEmail() != null && user.getPassword() != null) {
+				USER_REPOSITORY.updateUser(id, user);
+				return Response.status(Status.NO_CONTENT).build();
+			} else {
+				throw new InvalidUserFormatException(
+						"User must contain email and password");
+			}
 		}
-		return Response.status(Status.BAD_REQUEST).build();
+		throw new InvalidUserIdException(id);
 	}
 
 	@DELETE

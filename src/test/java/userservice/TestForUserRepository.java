@@ -9,7 +9,7 @@ import static org.junit.Assert.*;
 
 public class TestForUserRepository {
 
-	@Test
+	/*@Test
 	public void userDecodesSuccessfullyFromCommaSeparatedString() {
 		UserRepository userRepository = new UserRepository();
 
@@ -36,7 +36,7 @@ public class TestForUserRepository {
 			userRepository.decodeUserFromCommaSeparatedString(null,
 					userAsCommaSeparatedString);
 		}
-	}
+	}*/
 
 	@Test
 	public void addedUserExistsInRepository() {
